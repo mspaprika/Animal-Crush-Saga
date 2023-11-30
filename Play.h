@@ -1502,6 +1502,7 @@ struct GameObject
 	int radius{ 0 };
 	float scale{ 1 };
 	int lastFrameUpdated{ -1 };
+	int squareId{ 0 };
 
 	// Add your own data members here if you want to
 	PLAY_ADD_GAMEOBJECT_MEMBERS
