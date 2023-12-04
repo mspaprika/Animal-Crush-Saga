@@ -4,7 +4,15 @@
 #include "Play.h"
 #include "MainGame.h"
 
+enum AnimalState
+{
+	STATE_IDLE,
+	STATE_SWIPE,
+	STATE_MATCH,
+	STATE_FALL,
 
+	TOTAL_ANIMAL_STATES,
+};
 
 enum GameFlow
 {
@@ -23,9 +31,10 @@ enum GameObjectType
 struct GameState
 {
 	int score = 0;
-	bool mouseActive = true;
+	bool mouseActive{ true };
 
 	GameFlow state = STATE_PLAY;
+	AnimalState animalState = STATE_IDLE;
 };
 
 GameState gState;
@@ -39,9 +48,9 @@ struct Square
 	int horizontalID;
 	int verticalID;
 	int animalID;
-};
 
-Square square;
+	bool empty{ false };
+};
 
 std::vector<Square> squares;
 
@@ -110,14 +119,48 @@ void UpdateGameObjects(int TYPE)
 	}
 }
 
+void UpdateAnimals()
+{
+	std::vector <int> vAnimals = Play::CollectGameObjectIDsByType(TYPE_ANIMAL);
+
+	for (int id : vAnimals)
+	{
+		GameObject& animal = Play::GetGameObject(id);
+
+		switch (animal.state)
+		{
+			case STATE_IDLE:
+			{
+				UpdateMouseMovement();
+				
+				break;
+			}
+			case STATE_SWIPE:
+			{
+				Swipe(animal);
+				break;
+			}
+			case STATE_MATCH:
+			{
+				break;
+			}
+			case STATE_FALL:
+			{
+				break;
+			}
+		}
+
+		Play::UpdateGameObject(animal);
+	}
+}
+
 void UpdateGameStates()
 {
 	switch (gState.state)
 	{
 		case STATE_PLAY:
 		{
-			UpdateGameObjects(TYPE_ANIMAL);
-			UpdateMouseMovement();
+			UpdateAnimals();	
 			break;
 		}
 	}
@@ -125,17 +168,17 @@ void UpdateGameStates()
 
 void CreateGameObjects()
 {
-	int id = 0;
+	int idSquare = 0;
 
 	for (int i = 1; i < LINE_WIDTH; i++)
 	{
 		for (int j = 1; j < LINE_HEIGHT; j++)
 		{
-
+			Square square;
 			square.posX = LEFT_OFFSET + SQUARE_SIDE_LENGTH * i;
 			square.posY = SQUARE_SIDE_LENGTH * j;
 			square.sideLength = SQUARE_SIDE_LENGTH;
-			square.id = id;
+			square.id = idSquare;
 			square.horizontalID = i;
 			square.verticalID = j;
 
@@ -144,43 +187,46 @@ void CreateGameObjects()
 			Play::DrawRect( { square.posX - square.sideLength / 2, square.posY - square.sideLength / 2 }, { square.posX + square.sideLength / 2, square.posY + square.sideLength / 2 }, Play::cWhite);
 
 			int id = 0;
+			int sideLength = square.sideLength / 4;
 
 			switch (Play::RandomRoll(5))
 			{
 				case 1:
 				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, square.sideLength / 4, SPR_CAT);
+					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_CAT);
 					break;
 				}
 				case 2:
 				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, square.sideLength / 4, SPR_BEAR);
+					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_BEAR);
 					break;
 				}
 				case 3:
 				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, square.sideLength / 4, SPR_FOX);
+					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_FOX);
 					break;
 				}
 				case 4:
 				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, square.sideLength / 4, SPR_MOUSE);
+					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_MOUSE);
 					break;
 				}
 				case 5:
 				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, square.sideLength / 4, SPR_SNAKE);
+					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_SNAKE);
 					break;
 				}
 			}
 
 			square.animalID = id;
-			squares.push_back(square);
 
 			GameObject& animal = Play::GetGameObject(id);
-			animal.scale = 0.4f;
 			animal.squareId = square.id;
-			id++;
+			animal.state = STATE_IDLE;
+			animal.scale = 0.4f;
+			idSquare++;
+
+			squares.push_back(square);
 		}
 	}
 }
@@ -201,10 +247,15 @@ void CheckObjectCollision()
 	{
 		GameObject& animal = Play::GetGameObject(vAnimals[i]);
 
-		if (IsMouseOver(animal) )
+		if (IsMouseOver(animal))
 		{
 			CheckAnimalCollision(animal);
 			animal.pos = Play::GetMousePos();
+			animal.state = STATE_SWIPE;	
+		}
+		else
+		{
+			animal.pos = GetSquarePos(animal.squareId);
 		}
 	}
 }
@@ -217,36 +268,13 @@ void CheckAnimalCollision(GameObject& animal)
 	{
 		GameObject& otherAnimal = Play::GetGameObject(id);
 
-		Point2D tempPos1 = { squares[animal.squareId].posX, squares[animal.squareId].posY, };
-		Point2D tempPos2 = { squares[otherAnimal.squareId].posX, squares[otherAnimal.squareId].posY, };
-
-		int tempId = squares[animal.squareId].animalID;
-		int tempSquareId = squares[animal.squareId].id;
-
 		if (animal.pos != otherAnimal.pos && IsAnimalCollidingOtherAnimal(animal, otherAnimal))
 		{
-			gState.mouseActive = false;
-
-			animal.pos = tempPos2;
-			animal.squareId = otherAnimal.squareId;
-			squares[otherAnimal.squareId].animalID = animal.squareId;
-
-			otherAnimal.pos = tempPos1;
-			otherAnimal.squareId = tempId;
-			squares[tempId].animalID = tempSquareId;
-
+			SwipeAnimals(animal, otherAnimal);
 		}
 		else
 		{
-			animal.pos = tempPos1;
-			gState.mouseActive = true;
-		}
-
-		if (animal.pos == otherAnimal.pos)
-		{
-			animal.pos = tempPos1;
-			otherAnimal.pos = tempPos2;
-			gState.mouseActive = true;
+			
 		}
 	}
 }
@@ -273,8 +301,97 @@ bool IsAnimalCollidingOtherAnimal(const GameObject& obj_1, const GameObject& obj
 	return false;
 }
 
+void SwipeAnimals(GameObject& obj_1, GameObject& obj_2)
+{
+	obj_2.targetPos = GetSquarePos(obj_1.squareId);
+	obj_1.targetPos = GetSquarePos(obj_2.squareId);
 
+	if (obj_1.targetPos.x > obj_1.pos.x)
+	{
+		obj_1.velocity.x = 2.f;
+		obj_2.velocity.x = -2.f;
+	}
+	else if (obj_1.targetPos.x < obj_1.pos.x)
+	{
+		obj_1.velocity.x = -2.f;
+		obj_2.velocity.x = 2.f;		
+	} 
+	else if (obj_1.targetPos.y > obj_1.pos.y)
+	{
+		obj_1.velocity.y = 2.f;
+		obj_2.velocity.y = -2.f;
+	}
+	else if (obj_1.targetPos.y < obj_1.pos.y)
+	{
+		obj_1.velocity.y = -2.f;
+		obj_2.velocity.y = 2.f;
+	}
 
+	obj_1.state = STATE_SWIPE;
+	obj_2.state = STATE_SWIPE;
 
+}
+
+void Swipe(GameObject& animal)
+{
+	if (animal.pos == animal.targetPos)
+	{
+		animal.velocity = { 0, 0 };
+		animal.state = STATE_IDLE;
+		animal.squareId = GetSquareId(animal.targetPos);
+		squares[animal.squareId].empty = false;
+		animal.targetPos = { 0, 0 };
+		return;
+	}
+
+	if (animal.targetPos == Point2f{ 0, 0 })
+	{
+		return;
+	}
+
+	if (animal.velocity.x > 0)
+	{
+		if (animal.pos.x > animal.targetPos.x)
+		{
+			animal.velocity.x = 0;
+			animal.pos = animal.targetPos;
+		}
+	}
+	else if (animal.velocity.x < 0)
+	{
+			if (animal.pos.x < animal.targetPos.x)
+			{
+				animal.velocity.x = 0;
+				animal.pos = animal.targetPos;
+			}
+	}
+	else if (animal.velocity.y > 0 && animal.pos.y > animal.targetPos.y)
+	{
+		animal.velocity.y = 0;		
+		animal.pos = animal.targetPos;
+	
+	}
+	else if (animal.velocity.y < 0 && animal.pos.y < animal.targetPos.y)
+	{
+		animal.velocity.y = 0;
+		animal.pos = animal.targetPos;
+	}
+}
+
+Point2f GetSquarePos(int id)
+{
+	return { squares[id].posX, squares[id].posY };
+}
+
+int GetSquareId(Point2f pos)
+{
+	for (int i = 0; i < squares.size(); i++)
+	{
+		if (squares[i].posX == pos.x && squares[i].posY == pos.y)
+		{
+			return squares[i].id;
+		}
+	}
+}
 
 
