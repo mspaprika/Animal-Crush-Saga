@@ -13,12 +13,11 @@ const char* SPR_MOUSE = "mouse";
 const char* SPR_RABBIT = "rabbit";
 const char* SPR_SNAKE = "snake";
 
-const int SQUARE_SIDE_LENGTH = 75;
+const int SQUARE_SIDE_LENGTH = 75; // pixels
 const int LINE_WIDTH = 11; // <<  10 + 1 >>  it's actally 10 :).
 const int LINE_HEIGHT = 9; // <<  8 + 1 >>  it's actally 8 :).
 
 const int LEFT_OFFSET = 150;
-
 
 void UpdateGameStates();
 void CreateGameObjects();
@@ -26,7 +25,7 @@ void CreateGameObjects();
 void Draw();
 void DrawGameObjects(int TYPE);
 void UpdateGameObjects(int TYPE);
-
+void UpdateAnimals();
 
 void UpdateMouseMovement();
 
@@ -35,3 +34,9 @@ void CheckObjectCollision();
 
 void CheckAnimalCollision(GameObject& animal);
 bool IsAnimalCollidingOtherAnimal(const GameObject& obj_1, const GameObject& obj_2);
+
+void SwipeAnimals(GameObject& obj_1, GameObject& obj_2);
+void Swipe(GameObject& animal);
+
+Point2f GetSquarePos(int id);
+int GetSquareId(Point2f pos);

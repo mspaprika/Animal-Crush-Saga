@@ -1502,7 +1502,11 @@ struct GameObject
 	int radius{ 0 };
 	float scale{ 1 };
 	int lastFrameUpdated{ -1 };
+
 	int squareId{ 0 };
+
+	int state = 0;
+	Point2D targetPos{ 0.0f, 0.0f };
 
 	// Add your own data members here if you want to
 	PLAY_ADD_GAMEOBJECT_MEMBERS
