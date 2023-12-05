@@ -20,6 +20,7 @@ const int LINE_HEIGHT = 9; // <<  8 + 1 >>  it's actally 8 :).
 const int LEFT_OFFSET = 150;
 
 void UpdateGameStates();
+void UpdateDestroyed();
 void CreateGameObjects();
 
 void Draw();
@@ -40,3 +41,7 @@ void Swipe(GameObject& animal);
 
 Point2f GetSquarePos(int id);
 int GetSquareId(Point2f pos);
+
+void CheckSquare();
+void MatchThreeHorizontal(int id);
+void MatchThreeVertical(int id);
