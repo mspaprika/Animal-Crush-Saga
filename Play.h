@@ -1505,6 +1505,8 @@ struct GameObject
 
 	int squareId{ 0 };
 
+	int animalType{ -1 };
+
 	int state = 0;
 	Point2D targetPos{ 0.0f, 0.0f };
 
