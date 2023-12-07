@@ -4,66 +4,8 @@
 #include "Play.h"
 #include "MainGame.h"
 
-enum AnimalState
-{
-	STATE_IDLE,
-	STATE_SWIPE,
-	STATE_MATCH,
-	STATE_FALL,
-
-	TOTAL_ANIMAL_STATES,
-};
-
-enum GameFlow
-{
-	STATE_PLAY,
-
-	TOTAL_STATES,
-};
-
-enum GameObjectType
-{
-	TYPE_ANIMAL,
-	TYPE_DESTROYED,
-
-	TOTAL_TYPES,
-};
-
-enum AnimalType
-{
-	TYPE_CAT,
-	TYPE_BEAR,
-	TYPE_FOX,
-	TYPE_MOUSE,
-	TYPE_RABBIT,
-	TYPE_SNAKE,
-
-	TOTAL_ANIMAL_TYPES,
-};
-
-struct GameState
-{
-	int score = 0;
-	bool mouseActive{ true };
-
-	GameFlow state = STATE_PLAY;
-	AnimalState animalState = STATE_IDLE;
-};
 
 GameState gState;
-
-struct Square
-{
-	int posX;
-	int posY;
-	int sideLength;
-	int id;
-	int horizontalID;
-	int verticalID;
-	int animalID;
-
-	bool empty{ false };
-};
 
 std::vector<Square> squares;
 
@@ -75,17 +17,15 @@ void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
 	Play::LoadBackground(SPR_BACKGROUND);
 
 	CreateGameObjects();
+	GenerateAnimals();
 	CheckSquare();
 }
 
 bool MainGameUpdate( float elapsedTime )
 {
-	
 	UpdateMouseMovement();
-
 	UpdateGameStates();
 	Draw();
-
 
 	return Play::KeyDown( VK_ESCAPE );
 }
@@ -146,7 +86,11 @@ void UpdateAnimals()
 			case STATE_IDLE:
 			{
 				UpdateMouseMovement();
-				
+				animal.pos = animal.targetPos;
+
+				if (animal.squareId <= SWEEP_LIMIT)
+					BottomSweep(animal.squareId);
+
 				break;
 			}
 			case STATE_SWIPE:
@@ -157,9 +101,26 @@ void UpdateAnimals()
 			case STATE_MATCH:
 			{
 				animal.type = TYPE_DESTROYED;
+				squares[animal.squareId].empty = true;
+				squares[animal.squareId].booked = false;
+				TopRowCheck();
+
 				break;
 			}
 			case STATE_FALL:
+			{
+				if (animal.pos.y >= animal.targetPos.y)
+				{
+					DockAnimal(animal);
+					if (animal.squareId <= SWEEP_LIMIT)
+						BottomSweep(animal.squareId);	
+
+					CheckSquare();
+					TopRowCheck();
+				}
+				break;
+			}
+			case STATE_WAIT:
 			{
 				break;
 			}
@@ -175,8 +136,7 @@ void UpdateGameStates()
 	{
 		case STATE_PLAY:
 		{
-			UpdateAnimals();
-			CheckSquare();
+			UpdateAnimals();	
 			break;
 		}
 	}
@@ -200,52 +160,15 @@ void CreateGameObjects()
 			square.horizontalID = j;
 			square.verticalID = i;
 
-
 			Play::DrawRect( { square.posX - square.sideLength / 2, square.posY - square.sideLength / 2 }, { square.posX + square.sideLength / 2, square.posY + square.sideLength / 2 }, Play::cWhite);
 
-			int id = 0;
-			int sideLength = square.sideLength / 4;
-
-			switch (Play::RandomRoll(5))
-			{
-				case 1:
-				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_CAT);
-					Play::GetGameObject(id).animalType = TYPE_CAT;
-					break;
-				}
-				case 2:
-				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_BEAR);
-					Play::GetGameObject(id).animalType = TYPE_BEAR;
-					break;
-				}
-				case 3:
-				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_FOX);
-					Play::GetGameObject(id).animalType = TYPE_FOX;
-					break;
-				}
-				case 4:
-				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_MOUSE);
-					Play::GetGameObject(id).animalType = TYPE_MOUSE;
-					break;
-				}
-				case 5:
-				{
-					id = Play::CreateGameObject(TYPE_ANIMAL, { square.posX, square.posY }, sideLength, SPR_SNAKE);
-					Play::GetGameObject(id).animalType = TYPE_SNAKE;
-					break;
-				}
-			}
-
+			int id  = GenerateOneAnimal({ square.posX, square.posY });
 			square.animalID = id;
 
 			GameObject& animal = Play::GetGameObject(id);
 			animal.squareId = square.id;
 			animal.state = STATE_IDLE;
-			animal.scale = 0.4f;
+			animal.targetPos = animal.pos;
 			idSquare++;
 
 			squares.push_back(square);
@@ -277,6 +200,7 @@ void CheckObjectCollision()
 		}
 		else
 		{
+			if (animal.state == STATE_IDLE)
 			animal.pos = GetSquarePos(animal.squareId);
 		}
 	}
@@ -326,23 +250,23 @@ void SwipeAnimals(GameObject& obj_1, GameObject& obj_2)
 
 	if (obj_1.targetPos.x > obj_1.pos.x)
 	{
-		obj_1.velocity.x = 2.f;
-		obj_2.velocity.x = -2.f;
+		obj_1.velocity.x = SWIPE_SPEED.x;
+		obj_2.velocity.x = SWIPE_SPEED.x * (-1);
 	}
 	else if (obj_1.targetPos.x < obj_1.pos.x)
 	{
-		obj_1.velocity.x = -2.f;
-		obj_2.velocity.x = 2.f;		
+		obj_1.velocity.x = SWIPE_SPEED.x * (-1);
+		obj_2.velocity.x = SWIPE_SPEED.x;
 	} 
 	else if (obj_1.targetPos.y > obj_1.pos.y)
 	{
-		obj_1.velocity.y = 2.f;
-		obj_2.velocity.y = -2.f;
+		obj_1.velocity.y = SWIPE_SPEED.y;
+		obj_2.velocity.y = SWIPE_SPEED.y * (-1);
 	}
 	else if (obj_1.targetPos.y < obj_1.pos.y)
 	{
-		obj_1.velocity.y = -2.f;
-		obj_2.velocity.y = 2.f;
+		obj_1.velocity.y = SWIPE_SPEED.y * (-1);
+		obj_2.velocity.y = SWIPE_SPEED.y;
 	}
 
 	obj_1.state = STATE_SWIPE;
@@ -354,14 +278,8 @@ void Swipe(GameObject& animal)
 {
 	if (animal.pos == animal.targetPos)
 	{
-		animal.velocity = { 0, 0 };
-		animal.state = STATE_IDLE;
-		animal.squareId = GetSquareId(animal.targetPos);
-		squares[animal.squareId].empty = false;
-		squares[animal.squareId].animalID = animal.GetId();
-		animal.targetPos = { 0, 0 };
+		DockAnimal(animal);
 		CheckSquare();
-	
 		return;
 	}
 
@@ -410,23 +328,36 @@ void CheckSquare()
 {
 	for (Square& s : squares)
 	{
-		if (!s.empty && s.id < squares.size() - 2 && s.horizontalID < LINE_WIDTH - 2)
-		{
+		MatchThree(s);
+	}
+}
+
+void MatchThree(Square& s)
+{
+	if (!s.empty && s.id < squares.size() - 2 && s.horizontalID < LINE_WIDTH - 2)
+	{
+		if (Play::GetGameObject(s.animalID).state == STATE_IDLE)
 			MatchThreeHorizontal(s.id);
-		}
-		if (!s.empty && s.id < squares.size() - 2 && s.verticalID < LINE_HEIGHT - 2)
-		{
+	}
+	if (!s.empty && s.id < squares.size() - 2 && s.verticalID < LINE_HEIGHT - 2)
+	{
+		if (Play::GetGameObject(s.animalID).state == STATE_IDLE)
 			MatchThreeVertical(s.id);
-		}
 	}
 }
 
 void MatchThreeHorizontal(int id)
 {
-	GameObject& animal_one = Play::GetGameObject(squares[id].animalID);
-	GameObject& animal_two = Play::GetGameObject(squares[id + 1].animalID);
-	GameObject& animal_three = Play::GetGameObject(squares[id + 2].animalID);
+	int id2 = id + 1;
+	int id3 = id + 2;
 
+	GameObject& animal_one = Play::GetGameObject(squares[id].animalID);
+	GameObject& animal_two = Play::GetGameObject(squares[id2].animalID);
+	GameObject& animal_three = Play::GetGameObject(squares[id3].animalID);
+
+
+	if (animal_two.state != STATE_IDLE || animal_three.state != STATE_IDLE)
+		return;
 		
 	if (animal_one.animalType == animal_two.animalType && animal_two.animalType == animal_three.animalType)
 	{
@@ -438,9 +369,15 @@ void MatchThreeHorizontal(int id)
 
 void MatchThreeVertical(int id)
 {
+	int id2 = id + 10;
+	int id3 = id + 20;
+
 	GameObject& animal_one = Play::GetGameObject(squares[id].animalID);
-	GameObject& animal_two = Play::GetGameObject(squares[id + 10].animalID);
-	GameObject& animal_three = Play::GetGameObject(squares[id + 20].animalID);
+	GameObject& animal_two = Play::GetGameObject(squares[id2].animalID);
+	GameObject& animal_three = Play::GetGameObject(squares[id3].animalID);
+
+	if (animal_two.state != STATE_IDLE || animal_three.state != STATE_IDLE)
+		return;
 
 	if (animal_one.animalType == animal_two.animalType && animal_two.animalType == animal_three.animalType)
 	{
@@ -458,4 +395,126 @@ void UpdateDestroyed()
 		Play::DestroyGameObject(id);	
 	}
 }
+
+void BottomSweep(int id)
+{
+	GameObject& animal_one = Play::GetGameObject(squares[id].animalID);
+	Point2f pos = { squares[id].posX, squares[id].posY };
+
+	if (squares[id].empty)
+		return; 
+
+	if (squares[id + 10].empty && !(squares[id + 10].booked))
+	{
+		animal_one.targetPos = { squares[id + 10].posX, squares[id + 10].posY };
+		animal_one.velocity = FALL_SPEED;
+		animal_one.state = STATE_FALL;	
+		squares[id].empty = true;
+
+		squares[id + 10].booked = true;
+	}
+}
+
+void DockAnimal(GameObject& animal)
+{
+	animal.velocity = { 0, 0 };
+	animal.state = STATE_IDLE;
+	animal.squareId = GetSquareId(animal.targetPos);
+
+	squares[animal.squareId].empty = false;
+	squares[animal.squareId].animalID = animal.GetId();
+	squares[animal.squareId].booked = false;
+}
+
+void GenerateAnimals()
+{
+	Point2f pos = { 0, 0 };
+
+	for (int i = 0; i < LINE_WIDTH; i++)
+	{
+		pos = { LEFT_OFFSET + SQUARE_SIDE_LENGTH * i, NEW_POS_Y };
+		GenerateOneAnimal(pos);
+	}
+}
+
+int GenerateOneAnimal(Point2f pos)
+{
+	int id = 0;
+	int random = Play::RandomRoll(5);
+	
+	switch (random)
+	{
+		case 1:
+		{
+			id = Play::CreateGameObject(TYPE_ANIMAL, pos, SQUARE_SIDE_LENGTH / 4, SPR_CAT);
+			Play::GetGameObject(id).animalType = TYPE_CAT;
+			break;
+		}
+		case 2:
+		{
+			id = Play::CreateGameObject(TYPE_ANIMAL, pos, SQUARE_SIDE_LENGTH / 4, SPR_BEAR);
+			Play::GetGameObject(id).animalType = TYPE_BEAR;
+			break;
+		}
+		case 3:
+		{
+			id = Play::CreateGameObject(TYPE_ANIMAL, pos, SQUARE_SIDE_LENGTH / 4, SPR_FOX);
+			Play::GetGameObject(id).animalType = TYPE_FOX;
+			break;
+		}
+		case 4:
+		{
+			id = Play::CreateGameObject(TYPE_ANIMAL, pos, SQUARE_SIDE_LENGTH / 4, SPR_MOUSE);
+			Play::GetGameObject(id).animalType = TYPE_MOUSE;
+			break;
+		}
+		case 5:
+		{
+			id = Play::CreateGameObject(TYPE_ANIMAL, pos, SQUARE_SIDE_LENGTH / 4, SPR_SNAKE);
+			Play::GetGameObject(id).animalType = TYPE_SNAKE;
+			break;
+		}
+	}
+
+	GameObject& animal = Play::GetGameObject(id);
+	animal.state = STATE_WAIT;
+	animal.scale = 0.4f;
+
+	return id;
+}
+
+void TopRowCheck()
+{
+	for (int i = 0; i < LINE_WIDTH; i++)
+	{
+		if (squares[i].empty)
+		{
+			ReleaseNewAnimal(squares[i]);
+		}
+	}
+}
+
+void ReleaseNewAnimal(Square& s)
+{
+	std::vector <int> vAnimals = Play::CollectGameObjectIDsByType(TYPE_ANIMAL);
+
+	for (int id : vAnimals)
+	{
+		GameObject& animal = Play::GetGameObject(id);
+
+		if (animal.state == STATE_WAIT && animal.pos.x == s.posX && !s.booked)
+		{
+			GenerateOneAnimal({ s.posX, NEW_POS_Y });
+			animal.state = STATE_FALL;
+			animal.targetPos = { s.posX, s.posY };
+			animal.velocity = FALL_SPEED;
+
+			s.booked = true;
+		}
+	}
+}
+
+
+
+
 
