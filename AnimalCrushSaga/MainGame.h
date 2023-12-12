@@ -12,6 +12,8 @@ const char* SPR_MOUSE = "mouse";
 const char* SPR_RABBIT = "rabbit";
 const char* SPR_SNAKE = "chick";
 
+const char* SPR_BOOM = "star";
+
 const int SQUARE_SIDE_LENGTH = 75; // pixels
 const int LINE_WIDTH = 11; // <<  10 + 1 >>  it's actally 10 :).
 const int LINE_HEIGHT = 9; // <<  8 + 1 >>  it's actally 8 :).
@@ -60,6 +62,7 @@ enum GameFlow
 enum GameObjectType
 {
 	TYPE_ANIMAL,
+	TYPE_BOOM,
 	TYPE_DESTROYED,
 
 	TOTAL_TYPES,
@@ -112,12 +115,24 @@ Point2f GetSquarePos(int id);
 int GetSquareId(Point2f pos);
 
 void CheckSquare();
+
 void MatchThree(Square& s);
 void MatchThreeHorizontal(int id);
 void MatchThreeVertical(int id);
+void CheckThreeAnimals(int id, int id2, int id3);
+
+void MatchFour(Square& s);
+void MatchFourHorizontal(int id);
+void MatchFourVertical(int id);
+void CheckFourAnimals(int id, int id2, int id3, int id4);
 
 void DockAnimal(GameObject& animal);
 void BottomSweep(int id);
 
 void ReleaseNewAnimal(Square& s);
 void TopRowCheck();
+void Boom(Point2f pos);
+void UpdateBoom();
+
+void CheckIfSquareEmpty();
+bool IsAnimalInSquare(Square& s);
