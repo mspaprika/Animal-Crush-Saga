@@ -7,4 +7,4 @@ Recreation of Candy Crush Soda.
 <br>
 <br>
 
-<img src=".github/animalSaga4.gif" width="700">
+<img src="github/animalSaga4.gif" width="700">
